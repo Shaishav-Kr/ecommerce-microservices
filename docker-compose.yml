@@ -1,0 +1,90 @@
+version: "3.8"
+
+services:
+
+  auth-db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: authdb
+    volumes:
+      - auth-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d authdb"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  catalog-db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: catalogdb
+    volumes:
+      - catalog-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d catalogdb"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  orders-db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: ordersdb
+    volumes:
+      - orders-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d ordersdb"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  auth-service:
+    build: ./auth-service
+    ports:
+      - "8001:8001"
+    environment:
+      DATABASE_URL: postgresql://user:password@auth-db/authdb
+      SECRET_KEY: your-super-secret-jwt-key
+    depends_on:
+      auth-db:
+        condition: service_healthy
+
+  catalog-service:
+    build: ./catalog-service
+    ports:
+      - "8002:8002"
+    environment:
+      DATABASE_URL: postgresql://user:password@catalog-db/catalogdb
+      AUTH_SERVICE_URL: http://auth-service:8001
+    depends_on:
+      catalog-db:
+        condition: service_healthy
+      auth-service:
+        condition: service_started
+
+  orders-service:
+    build: ./orders-service
+    ports:
+      - "8003:8003"
+    environment:
+      DATABASE_URL: postgresql://user:password@orders-db/ordersdb
+      AUTH_SERVICE_URL: http://auth-service:8001
+      CATALOG_SERVICE_URL: http://catalog-service:8002
+    depends_on:
+      orders-db:
+        condition: service_healthy
+      auth-service:
+        condition: service_started
+      catalog-service:
+        condition: service_started
+
+volumes:
+  auth-db-data:
+  catalog-db-data:
+  orders-db-data:
